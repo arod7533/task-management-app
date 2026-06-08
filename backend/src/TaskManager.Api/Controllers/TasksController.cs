@@ -71,12 +71,35 @@ public class TasksController : ControllerBase
         var task = await _db.Tasks.FirstOrDefaultAsync(x => x.Id == id, ct);
         if (task is null) return NotFound();
 
+        // Set the original version EF will compare against on UPDATE. If the
+        // row's current version differs, SaveChangesAsync throws
+        // DbUpdateConcurrencyException and we return 409.
+        _db.Entry(task).Property(t => t.Version).OriginalValue = body.Version;
+
         task.Title = body.Title.Trim();
         task.Description = string.IsNullOrWhiteSpace(body.Description) ? null : body.Description.Trim();
         task.DueDate = body.DueDate;
         task.Status = body.Status;
 
-        await _db.SaveChangesAsync(ct);
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Reload the server's current state so the client can show it
+            // alongside the user's pending edit when resolving the conflict.
+            var current = await _db.Tasks.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
+            return Conflict(new ProblemDetails
+            {
+                Type = "https://httpstatuses.io/409",
+                Title = "Concurrency conflict",
+                Status = StatusCodes.Status409Conflict,
+                Detail = "This task was modified by another session. Reload to see the latest version, or resubmit with the current version to overwrite.",
+                Extensions = { ["current"] = current is null ? null : TaskResponse.From(current) }
+            });
+        }
+
         return Ok(TaskResponse.From(task));
     }
 
@@ -86,7 +109,7 @@ public class TasksController : ControllerBase
         var task = await _db.Tasks.FirstOrDefaultAsync(x => x.Id == id, ct);
         if (task is null) return NotFound();
 
-        _db.Tasks.Remove(task);
+        task.DeletedAt = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync(ct);
         return NoContent();
     }

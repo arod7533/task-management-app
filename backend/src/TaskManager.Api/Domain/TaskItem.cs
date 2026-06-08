@@ -16,4 +16,6 @@ public class TaskItem
     public TaskItemStatus Status { get; set; } = TaskItemStatus.Todo;
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
+    public DateTimeOffset? DeletedAt { get; set; }
+    public int Version { get; set; }
 }

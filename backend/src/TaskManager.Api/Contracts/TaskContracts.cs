@@ -27,7 +27,12 @@ public record UpdateTaskRequest(
     DateTimeOffset? DueDate,
 
     [Required(ErrorMessage = "Status is required.")]
-    TaskItemStatus Status
+    TaskItemStatus Status,
+
+    // Optimistic concurrency token returned by GET/POST/PUT. Clients must
+    // echo the version they edited; a mismatch yields 409 Conflict.
+    [Required(ErrorMessage = "Version is required for updates.")]
+    int Version
 );
 
 public record TaskResponse(
@@ -37,10 +42,11 @@ public record TaskResponse(
     DateTimeOffset? DueDate,
     TaskItemStatus Status,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt
+    DateTimeOffset UpdatedAt,
+    int Version
 )
 {
     public static TaskResponse From(TaskItem t) => new(
         t.Id, t.Title, t.Description, t.DueDate, t.Status,
-        t.CreatedAt, t.UpdatedAt);
+        t.CreatedAt, t.UpdatedAt, t.Version);
 }
