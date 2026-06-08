@@ -6,7 +6,7 @@ import type {
   Task,
   TaskItemStatus,
   UpdateTaskRequest,
-} from "../types";
+} from "../schemas";
 
 export type ConflictInfo = {
   attempted: UpdateTaskRequest;

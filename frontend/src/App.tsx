@@ -4,8 +4,8 @@ import { ConflictBanner } from "./components/ConflictBanner";
 import { TaskForm } from "./components/TaskForm";
 import { TaskRow } from "./components/TaskRow";
 import { useTasks } from "./hooks/useTasks";
-import { STATUS_LABEL, STATUS_VALUES } from "./types";
-import type { TaskItemStatus } from "./types";
+import { STATUS_LABEL, STATUS_VALUES } from "./schemas";
+import type { TaskItemStatus } from "./schemas";
 
 type Filter = TaskItemStatus | "All";
 

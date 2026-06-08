@@ -1,7 +1,11 @@
 import { useState, type FormEvent } from "react";
 import { ApiException } from "../api/client";
-import { STATUS_LABEL, STATUS_VALUES } from "../types";
-import type { Task, TaskItemStatus, UpdateTaskRequest } from "../types";
+import {
+  CreateTaskRequestSchema,
+  STATUS_LABEL,
+  STATUS_VALUES,
+} from "../schemas";
+import type { Task, TaskItemStatus, UpdateTaskRequest } from "../schemas";
 
 type Props =
   | {
@@ -49,26 +53,36 @@ export function TaskForm(props: Props) {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [formError, setFormError] = useState<string | null>(null);
 
-  function clientValidate(): boolean {
-    const errs: Record<string, string[]> = {};
-    if (!title.trim()) errs.Title = ["Title is required."];
-    else if (title.length > 200) errs.Title = ["Title must be 1-200 characters."];
-    if (description.length > 2000) errs.Description = ["Description must be 2000 characters or fewer."];
-    setFieldErrors(errs);
-    return Object.keys(errs).length === 0;
-  }
-
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setFormError(null);
-    if (!clientValidate()) return;
 
-    const body = {
+    // Validate through the same Zod schema the API client uses. The server's
+    // [Required]/[StringLength] attributes are mirrored in the schema, so a
+    // failure here would have been a 400 from the API anyway — we just catch
+    // it one round-trip earlier.
+    const parsed = CreateTaskRequestSchema.safeParse({
       title: title.trim(),
       description: description.trim() ? description.trim() : null,
       dueDate: localInputToIso(dueDate),
       status,
-    };
+    });
+
+    if (!parsed.success) {
+      // Server's ASP.NET ProblemDetails uses PascalCase keys ("Title");
+      // mirror that here so the rendering code is the same in both paths.
+      const errs: Record<string, string[]> = {};
+      for (const issue of parsed.error.issues) {
+        const key = issue.path[0];
+        if (typeof key !== "string") continue;
+        const pascal = key.charAt(0).toUpperCase() + key.slice(1);
+        (errs[pascal] ??= []).push(issue.message);
+      }
+      setFieldErrors(errs);
+      return;
+    }
+
+    const body = parsed.data;
 
     setSubmitting(true);
     try {
