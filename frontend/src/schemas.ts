@@ -65,3 +65,24 @@ export type ApiError = {
   errors?: Record<string, string[]>;
   current?: Task;
 };
+
+// Auth contracts.
+export const RegisterRequestSchema = z.object({
+  email: z.string().email("Enter a valid email address."),
+  password: z.string().min(8, "Password must be at least 8 characters."),
+});
+export type RegisterRequest = z.infer<typeof RegisterRequestSchema>;
+
+export const LoginRequestSchema = z.object({
+  email: z.string().email("Enter a valid email address."),
+  password: z.string().min(1, "Password is required."),
+});
+export type LoginRequest = z.infer<typeof LoginRequestSchema>;
+
+export const AuthResponseSchema = z.object({
+  token: z.string(),
+  expiresAt: z.string(),
+  userId: z.string().uuid(),
+  email: z.string(),
+});
+export type AuthResponse = z.infer<typeof AuthResponseSchema>;

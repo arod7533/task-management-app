@@ -1,5 +1,7 @@
 import { useState } from "react";
 import "./App.css";
+import { AuthProvider, useAuth } from "./auth/AuthContext";
+import { AuthScreen } from "./components/AuthScreen";
 import { ConflictBanner } from "./components/ConflictBanner";
 import { TaskForm } from "./components/TaskForm";
 import { TaskRow } from "./components/TaskRow";
@@ -9,7 +11,8 @@ import type { TaskItemStatus } from "./schemas";
 
 type Filter = TaskItemStatus | "All";
 
-function App() {
+function TasksView() {
+  const { session, logout } = useAuth();
   const [filter, setFilter] = useState<Filter>("All");
   const {
     tasks,
@@ -26,8 +29,12 @@ function App() {
 
   return (
     <div className="app">
-      <header>
+      <header className="app-header">
         <h1>Tasks</h1>
+        <div className="who">
+          <span className="muted">{session?.email}</span>
+          <button onClick={logout}>Sign out</button>
+        </div>
       </header>
 
       {error && (
@@ -85,6 +92,19 @@ function App() {
         )}
       </section>
     </div>
+  );
+}
+
+function Gate() {
+  const { session } = useAuth();
+  return session ? <TasksView /> : <AuthScreen />;
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <Gate />
+    </AuthProvider>
   );
 }
 
