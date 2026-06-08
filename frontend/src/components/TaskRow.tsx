@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { STATUS_LABEL } from "../types";
-import type { Task, UpdateTaskRequest } from "../types";
+import { STATUS_LABEL } from "../schemas";
+import type { Task, UpdateTaskRequest } from "../schemas";
 import { TaskForm } from "./TaskForm";
 
 interface Props {

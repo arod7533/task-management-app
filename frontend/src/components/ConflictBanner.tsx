@@ -1,4 +1,4 @@
-import { STATUS_LABEL } from "../types";
+import { STATUS_LABEL } from "../schemas";
 import type { ConflictInfo } from "../hooks/useTasks";
 
 interface Props {
