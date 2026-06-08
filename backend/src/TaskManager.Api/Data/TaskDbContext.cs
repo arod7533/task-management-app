@@ -24,6 +24,19 @@ public class TaskDbContext : DbContext
         task.Property(t => t.CreatedAt).HasConversion<string>();
         task.Property(t => t.UpdatedAt).HasConversion<string>();
         task.Property(t => t.DueDate).HasConversion<string>();
+        task.Property(t => t.DeletedAt).HasConversion<string>();
+
+        // Optimistic concurrency. SQLite has no native rowversion, so the
+        // integer is incremented on every save (see SaveChangesAsync) and
+        // checked in the UPDATE WHERE clause.
+        task.Property(t => t.Version).IsConcurrencyToken();
+
+        // Soft delete: hide rows where DeletedAt IS NOT NULL by default.
+        // Use IgnoreQueryFilters() to opt out (e.g. admin / audit views).
+        task.HasQueryFilter(t => t.DeletedAt == null);
+
+        // Indexed to keep filtered scans cheap as the table grows.
+        task.HasIndex(t => t.DeletedAt);
     }
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
@@ -35,10 +48,12 @@ public class TaskDbContext : DbContext
             {
                 entry.Entity.CreatedAt = now;
                 entry.Entity.UpdatedAt = now;
+                entry.Entity.Version = 1;
             }
             else if (entry.State == EntityState.Modified)
             {
                 entry.Entity.UpdatedAt = now;
+                entry.Entity.Version += 1;
             }
         }
         return await base.SaveChangesAsync(cancellationToken);
