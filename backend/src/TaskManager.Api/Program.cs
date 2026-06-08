@@ -1,5 +1,9 @@
+using System.Text;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using TaskManager.Api.Auth;
 using TaskManager.Api.Data;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -11,9 +15,46 @@ builder.Services.AddCors(o => o.AddPolicy(FrontendCors, p => p
     .AllowAnyHeader()
     .AllowAnyMethod()));
 
+// DbContext is scoped; ICurrentUserAccessor is scoped because it reads from
+// the per-request HttpContext.
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentUserAccessor, CurrentUserAccessor>();
+
 builder.Services.AddDbContext<TaskDbContext>(opt =>
     opt.UseSqlite(builder.Configuration.GetConnectionString("Default")
         ?? "Data Source=tasks.db"));
+
+builder.Services.AddSingleton<IPasswordHasher, Argon2idPasswordHasher>();
+
+var jwtOptions = builder.Configuration.GetSection("Jwt").Get<JwtOptions>() ?? new JwtOptions();
+if (string.IsNullOrEmpty(jwtOptions.SigningKey))
+{
+    var envName = builder.Environment.EnvironmentName;
+    if (envName == Environments.Development || envName == "Testing")
+        jwtOptions.SigningKey = "dev-only-signing-key-please-replace-in-production-environments";
+    else
+        throw new InvalidOperationException("Jwt:SigningKey must be set outside of Development.");
+}
+builder.Services.AddSingleton(jwtOptions);
+builder.Services.AddSingleton<IJwtIssuer, JwtIssuer>();
+
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(opt =>
+    {
+        opt.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = jwtOptions.Issuer,
+            ValidAudience = jwtOptions.Audience,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.SigningKey)),
+            ClockSkew = TimeSpan.FromSeconds(30),
+        };
+    });
+builder.Services.AddAuthorization();
 
 builder.Services
     .AddControllers()
@@ -28,8 +69,6 @@ builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-// Apply migrations on startup. Cheap for SQLite + makes fresh-clone setup
-// match the README ("dotnet run" — no manual migrate step).
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<TaskDbContext>();
@@ -44,6 +83,7 @@ if (app.Environment.IsDevelopment())
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 app.UseCors(FrontendCors);
+app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 

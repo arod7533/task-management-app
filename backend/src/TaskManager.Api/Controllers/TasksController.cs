@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TaskManager.Api.Contracts;
@@ -7,12 +8,18 @@ using TaskManager.Api.Domain;
 namespace TaskManager.Api.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/tasks")]
 public class TasksController : ControllerBase
 {
     private readonly TaskDbContext _db;
+    private readonly ICurrentUserAccessor _user;
 
-    public TasksController(TaskDbContext db) => _db = db;
+    public TasksController(TaskDbContext db, ICurrentUserAccessor user)
+    {
+        _db = db;
+        _user = user;
+    }
 
     [HttpGet]
     public async Task<ActionResult<IEnumerable<TaskResponse>>> List(
@@ -50,6 +57,7 @@ public class TasksController : ControllerBase
         var task = new TaskItem
         {
             Id = Guid.NewGuid(),
+            OwnerId = _user.UserId!.Value,
             Title = body.Title.Trim(),
             Description = string.IsNullOrWhiteSpace(body.Description) ? null : body.Description.Trim(),
             DueDate = body.DueDate,
@@ -59,7 +67,8 @@ public class TasksController : ControllerBase
         _db.Tasks.Add(task);
         await _db.SaveChangesAsync(ct);
 
-        return CreatedAtAction(nameof(Get), new { id = task.Id }, TaskResponse.From(task));
+        var resp = TaskResponse.From(task);
+        return CreatedAtAction(nameof(Get), new { id = task.Id }, resp);
     }
 
     [HttpPut("{id:guid}")]
